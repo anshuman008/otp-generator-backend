@@ -1,9 +1,18 @@
+require("dotenv").config();
+require("./db/mongoose");
 const express = require("express");
 const axios = require("axios");
 const svgCaptcha = require("svg-captcha");
 const app = express();
 const cors = require("cors");
 const session = require("express-session");
+
+const adminRoutes = require("./routes/admin");
+const userRoutes = require("./routes/user");
+
+const user_auth = require("./middleware/user_auth");
+const { createInHoldTransaction } = require("./controllers/money");
+
 const apiKey = "29963e8b073ee4b745be2ed51409fb08";
 const service = "us";
 const country = 22;
@@ -13,7 +22,7 @@ app.use(express.json());
 const secretKey = generateRandomString(32);
 app.use(
   session({
-    secret: secretKey, // Change this to a secure secret key
+    secret: secretKey,
     resave: false,
     saveUninitialized: true,
   })
@@ -41,7 +50,13 @@ app.get("/api/getNumber", async (req, res) => {
         },
       }
     );
-
+    const userId = '6571db6f890ed6c52bc4cd52'
+    // const userId = req.user._id
+    const numberSequence = response.data.split(":").pop().substring(2);
+    const handleTransaction = await createInHoldTransaction(userId, 10, 'irctc', numberSequence);
+    if (handleTransaction.error) {
+      res.status(404);
+    }
     res.json(response.data);
   } catch (error) {
     console.error("Error fetching data from the APIs:", error.message);
@@ -52,7 +67,6 @@ app.get("/api/getNumber", async (req, res) => {
 app.get("/api/cancelNumber", async (req, res) => {
   try {
     const { id } = req.query;
-    console.log(id, "id");
 
     if (!id) {
       return res.status(400).json({ error: "Missing 'id' parameter" });
@@ -131,10 +145,6 @@ app.post("/verify-captcha", (req, res) => {
   const { captcha } = req.body;
   const expectedCaptcha = req.session.captcha;
 
-  console.log(req.body, 'body')
-  console.log(req, 'session')
-  console.log(req.session.captcha, 'captcha')
-
   if (captcha === expectedCaptcha) {
     res.json({ success: true });
   } else {
@@ -151,5 +161,8 @@ function generateRandomString(length) {
   }
   return result;
 }
+
+app.use(adminRoutes);
+app.use(userRoutes);
 
 app.listen(5001, () => console.log("server started on 5001"));
