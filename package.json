@@ -51,6 +51,8 @@
     "safe-buffer": "^5.2.1",
     "send": "^0.18.0",
     "serve-static": "^1.15.0",
+    "serverless-dotenv-plugin": "^6.0.0",
+    "serverless-http": "^3.2.0",
     "setprototypeof": "^1.2.0",
     "statuses": "^2.0.1",
     "svg-captcha": "^1.4.0",

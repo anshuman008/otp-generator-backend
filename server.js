@@ -2,7 +2,7 @@ require("dotenv").config();
 require("./db/mongoose");
 const express = require("express");
 const axios = require("axios");
-const svgCaptcha = require("svg-captcha");
+const serverless = require("serverless-http");
 const app = express();
 const cors = require("cors");
 const session = require("express-session");
@@ -159,3 +159,5 @@ app.use(adminRoutes);
 app.use(userRoutes);
 
 app.listen(8080, () => console.log("server started on 8080"));
+
+module.exports.handler = serverless(app);
