@@ -1,0 +1,27 @@
+service: otp-service
+frameworkVersion: "3"
+
+plugins:
+    - serverless-dotenv-plugin
+
+provider:
+    name: aws
+    runtime: nodejs16.x
+    region: ap-south-1
+    deploymentBucket:
+        name: otp-backend-deployment-bucket
+
+functions:
+    api:
+        handler: index.handler
+        timeout: 180
+        events:
+            - httpApi: "*"
+            - httpApi:
+                  path: /{proxy+}
+                  method: ANY
+                  cors: true
+            - http:
+                  path: /{proxy+}
+                  method: ANY
+                  cors: true
