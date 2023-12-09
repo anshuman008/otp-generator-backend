@@ -59,7 +59,7 @@ app.get("/api/getNumber", user_auth, async (req, res) => {
       console.log(handleTransaction.error, 'errr')
       res.status(404);
     }
-    res.json({data:response.data});
+    res.json({ data: response.data });
   } catch (error) {
     console.error("Error fetching data from the APIs:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
@@ -133,33 +133,15 @@ app.get("/api/getOtp", async (req, res) => {
         },
       }
     );
-    if(response.data.includes("STATUS_OK")) {
+    if (response.data.includes("STATUS_OK")) {
       console.log('status ok')
       const otp = response.data.split(":")[1]
-      await successTransaction(phoneNumber,otp);
+      await successTransaction(phoneNumber, otp);
     }
     res.json(response.data);
   } catch (error) {
     console.error("Error fetching data from the APIs:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-app.get("/captcha", (req, res) => {
-  const captcha = svgCaptcha.create();
-  req.session.captcha = captcha.text; // Save captcha value in session for validation
-  res.type("svg");
-  res.status(200).send(captcha.data);
-});
-
-app.post("/verify-captcha", (req, res) => {
-  const { captcha } = req.body;
-  const expectedCaptcha = req.session.captcha;
-
-  if (captcha === expectedCaptcha) {
-    res.json({ success: true });
-  } else {
-    res.json({ success: false });
   }
 });
 
