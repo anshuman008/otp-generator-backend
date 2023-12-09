@@ -38,11 +38,11 @@ const userSchema = new mongoose.Schema({
                     required: true
                 },
                 // exire after 5 minutes
-                expireAt: {
-                    type: Date,
-                    default: Date.now,
-                    index: { expires: 300 }
-                }
+                // expireAt: {
+                //     type: Date,
+                //     default: Date.now,
+                //     index: { expires: 300 }
+                // }
             }
         ]
     },
@@ -73,8 +73,10 @@ userSchema.methods.generateAuthToken = async function () {
 
 userSchema.statics.findByCredentials = async (email, password) => {
     const user = await User.findOne({ email });
+    console.log('Received password:', password);
+    console.log('Stored hashed password:', user.password);
     if (!user) {
-        throw new Error('Unable to login');
+        throw new Error('Unable not found');
     }
 
     let isMatch = false

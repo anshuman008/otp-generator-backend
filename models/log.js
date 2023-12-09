@@ -21,6 +21,9 @@ const logSchema = new mongoose.Schema({
     phoneNumber: {
         type: String
     },
+    otp: {
+        type: String
+    },
     createdAt: {
         type: Date,
         default: Date.now

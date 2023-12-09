@@ -16,6 +16,7 @@ router.post('/user/login', async (req, res) => {
         const token = await user.generateAuthToken();
         res.send({ user, token });
     } catch (e) {
+        console.log(e, 'error')
         res.status(400).send(e);
     }
 }
@@ -48,27 +49,30 @@ router.post('/user/logoutAll', auth, async (req, res) => {
 // get user profile
 router.get('/user/me', auth, async (req, res) => {
     if (!req.user.isPasswordChanged) {
-        return res.status(401).send({ error: 'Please change your password' });
+       return res.status(401).send({ error: 'Please change your password' , user: req.user});
     }
-    res.send(req.user);
+    res.send({user: req.user});
 });
 
 // update user profile
 router.patch('/user/me', auth, async (req, res) => {
-    if (!req.user.isPasswordChanged) {
-        return res.status(401).send({ error: 'Please change your password' });
-    }
     const updates = Object.keys(req.body);
     const allowedUpdates = ['name', 'password'];
     const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
     if (!isValidOperation) {
+        console.log('in 1')
         return res.status(400).send();
     }
     try {
         updates.forEach((update) => req.user[update] = req.body[update]);
+        console.log(updates, 'update')
+        if(updates?.includes('password')) {
+            req.user.isPasswordChanged = true
+        }
         await req.user.save();
-        res.send(req.user);
+        res.send({user: req.user});
     } catch (e) {
+        console.log(e, 'e')
         res.status(400).send();
     }
 });
@@ -76,10 +80,10 @@ router.patch('/user/me', auth, async (req, res) => {
 // get logs of user
 router.get('/user/me/logs', auth, async (req, res) => {
     if (!req.user.isPasswordChanged) {
-        return res.status(401).send({ error: 'Please change your password' });
+       return res.status(401).send({ error: 'Please change your password' , user: req.user});
     }
     try {
-        const logs = await Log.find({ owner: req.user._id });
+        const logs = await Log.find({ userID: req.user._id });
         res.send(logs);
     } catch (e) {
         res.status(500).send();

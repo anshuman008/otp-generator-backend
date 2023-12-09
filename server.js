@@ -11,7 +11,7 @@ const adminRoutes = require("./routes/admin");
 const userRoutes = require("./routes/user");
 
 const user_auth = require("./middleware/user_auth");
-const { createInHoldTransaction } = require("./controllers/money");
+const { createInHoldTransaction, failTransaction, successTransaction } = require("./controllers/money");
 
 const apiKey = "29963e8b073ee4b745be2ed51409fb08";
 const service = "us";
@@ -28,7 +28,7 @@ app.use(
   })
 );
 
-app.get("/api/getNumber", async (req, res) => {
+app.get("/api/getNumber", user_auth, async (req, res) => {
   try {
     const response = await axios.get(
       `https://api.grizzlysms.com/stubs/handler_api.php`,
@@ -50,26 +50,31 @@ app.get("/api/getNumber", async (req, res) => {
         },
       }
     );
-    const userId = '6571db6f890ed6c52bc4cd52'
-    // const userId = req.user._id
+    // const userId = '6571db6f890ed6c52bc4cd52'
+    const userId = req.user._id
+    console.log(userId, 'req.user')
     const numberSequence = response.data.split(":").pop().substring(2);
     const handleTransaction = await createInHoldTransaction(userId, 10, 'irctc', numberSequence);
     if (handleTransaction.error) {
+      console.log(handleTransaction.error, 'errr')
       res.status(404);
     }
-    res.json(response.data);
+    res.json({data:response.data});
   } catch (error) {
     console.error("Error fetching data from the APIs:", error.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-app.get("/api/cancelNumber", async (req, res) => {
+app.get("/api/cancelNumber", user_auth, async (req, res) => {
   try {
-    const { id } = req.query;
+    const { id, phoneNumber } = req.query;
 
     if (!id) {
       return res.status(400).json({ error: "Missing 'id' parameter" });
+    }
+    if (!phoneNumber) {
+      return res.status(400).json({ error: "Missing 'phoneNumber' parameter" });
     }
 
     const response = await axios.get(
@@ -93,6 +98,7 @@ app.get("/api/cancelNumber", async (req, res) => {
         },
       }
     );
+    await failTransaction(phoneNumber)
     res.json(response.data);
   } catch (error) {
     console.error("Error fetching data from the APIs:", error.message);
@@ -102,7 +108,7 @@ app.get("/api/cancelNumber", async (req, res) => {
 
 app.get("/api/getOtp", async (req, res) => {
   try {
-    const { id } = req.query;
+    const { id, phoneNumber } = req.query;
 
     if (!id) {
       return res.status(400).json({ error: "Missing 'id' parameter" });
@@ -127,6 +133,11 @@ app.get("/api/getOtp", async (req, res) => {
         },
       }
     );
+    if(response.data.includes("STATUS_OK")) {
+      console.log('status ok')
+      const otp = response.data.split(":")[1]
+      await successTransaction(phoneNumber,otp);
+    }
     res.json(response.data);
   } catch (error) {
     console.error("Error fetching data from the APIs:", error.message);
@@ -165,4 +176,4 @@ function generateRandomString(length) {
 app.use(adminRoutes);
 app.use(userRoutes);
 
-app.listen(5001, () => console.log("server started on 5001"));
+app.listen(8080, () => console.log("server started on 8080"));
