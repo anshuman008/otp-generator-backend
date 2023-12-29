@@ -17,8 +17,8 @@ const apiKey = "29963e8b073ee4b745be2ed51409fb08";
 const service = "us";
 const country = 22;
 
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 const secretKey = generateRandomString(32);
 app.use(
   session({
@@ -145,6 +145,23 @@ app.get("/api/getOtp", async (req, res) => {
   }
 });
 
+app.get("/captcha", (req, res) => {
+  const captcha = svgCaptcha.create();
+  req.session.captcha = captcha.text;
+  res.type("svg");
+  res.status(200).send(captcha.data);
+});
+
+app.post("/verify-captcha", (req, res) => {
+  const { captcha } = req.body;
+  const expectedCaptcha = req.session.captcha;
+  if (captcha === expectedCaptcha) {
+    res.json({ success: true });
+  } else {
+    res.json({ success: false });
+  }
+});
+
 function generateRandomString(length) {
   const characters =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -158,6 +175,6 @@ function generateRandomString(length) {
 app.use(adminRoutes);
 app.use(userRoutes);
 
-app.listen(8080, () => console.log("server started on 8080"));
+// app.listen(8080, () => console.log("server started on 8080"));
 
 module.exports.handler = serverless(app);
