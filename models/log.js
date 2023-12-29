@@ -9,7 +9,7 @@ function getCurrentISTDate() {
         .replace(/T/, ',')   // replace T with a comma
         .replace(/\..+/, '') // delete the dot and everything after
         .replace(/-/g, '-')  // format to yyyy-mm-dd
-        .replace(/:/g, ','); // format time to hh,mm,ss
+        .replace(/:/g, ':'); // format time to hh,mm,ss
 }
 
 const logSchema = new mongoose.Schema({

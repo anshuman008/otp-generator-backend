@@ -175,6 +175,6 @@ function generateRandomString(length) {
 app.use(adminRoutes);
 app.use(userRoutes);
 
-app.listen(3000, () => console.log("server started on 3000"));
+app.listen(5001, () => console.log("server started on 5001"));
 
 module.exports.handler = serverless(app);

@@ -156,8 +156,8 @@ router.get('/admin/earnings', auth, async (req, res) => {
         const { from, to } = req.body;
 
         // Convert the dates to the log's date format
-        const fromDate = formatToLogDate(from) + ",00,00,00";
-        const toDate = formatToLogDate(to) + ",23,59,59";
+        const fromDate = formatToLogDate(from) + ",00:00:00";
+        const toDate = formatToLogDate(to) + ",23:59:59";
 
         // get all logs in the date range
         const logs = await Log.find({
