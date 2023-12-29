@@ -7,6 +7,7 @@ const Log = require('../models/log');
 const auth = require('../middleware/admin_auth');
 
 const { searchUser, createUser } = require('../controllers/user');
+const formatToLogDate = require('../controllers/time_format');
 
 // login
 router.post('/admin/login', async (req, res) => {
@@ -15,7 +16,7 @@ router.post('/admin/login', async (req, res) => {
         const token = await admin.generateAuthToken();
         res.send({ admin, token });
     } catch (e) {
-        console.log(e,' e')
+        console.log(e, ' e')
         res.status(400).send(e);
     }
 }
@@ -147,5 +148,44 @@ router.post('/admin/createAdmin', auth, async (req, res) => {
         res.status(500).send();
     }
 });
+
+// get log of the earnings
+router.get('/admin/earnings', auth, async (req, res) => {
+    try {
+        // get date range from the body
+        const { from, to } = req.body;
+
+        // Convert the dates to the log's date format
+        const fromDate = formatToLogDate(from) + ",00,00,00";
+        const toDate = formatToLogDate(to) + ",23,59,59";
+
+        // get all logs in the date range
+        const logs = await Log.find({
+            createdAt: {
+                $gte: fromDate,
+                $lt: toDate
+            }
+        });
+
+        // calculate the earnings from the logs by day
+        const earnings = logs.reduce((acc, log) => {
+            // Extract just the date part
+            const date = log.createdAt.split(',')[0];
+            if (!acc[date]) {
+                acc[date] = log.amount;
+            } else {
+                acc[date] += log.amount;
+            }
+            return acc;
+        }, {});
+
+        res.send(earnings);
+
+    } catch (e) {
+        res.status(500).send(e.message);
+    }
+});
+
+
 
 module.exports = router;
