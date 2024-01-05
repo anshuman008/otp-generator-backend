@@ -30,7 +30,10 @@ app.use(
 app.post("/api/getNumber", user_auth, async (req, res) => {
   try {
 
-    const { service, country } = req.body;
+    // service: string, e.g. "wa" for WhatsApp
+    // country: int, e.g. 22 for India
+    // amount: float, e.g. 1.22
+    const { service, country, amount } = req.body;
 
     const response = await axios.get(
       `https://api.grizzlysms.com/stubs/handler_api.php`,
@@ -55,7 +58,7 @@ app.post("/api/getNumber", user_auth, async (req, res) => {
     const userId = req.user._id
     console.log(userId, 'req.user')
     const numberSequence = response.data.split(":").pop().substring(2);
-    const handleTransaction = await createInHoldTransaction(userId, 10, 'irctc', numberSequence);
+    const handleTransaction = await createInHoldTransaction(userId, amount, 'irctc', numberSequence);
     if (handleTransaction.error) {
       console.log(handleTransaction.error, 'errr')
       res.status(404);
