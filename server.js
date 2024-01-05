@@ -9,6 +9,7 @@ const session = require("express-session");
 
 const adminRoutes = require("./routes/admin");
 const userRoutes = require("./routes/user");
+const serviceRoutes = require("./routes/service");
 
 const user_auth = require("./middleware/user_auth");
 const { createInHoldTransaction, failTransaction, successTransaction } = require("./controllers/money");
@@ -50,7 +51,6 @@ app.get("/api/getNumber", user_auth, async (req, res) => {
         },
       }
     );
-    // const userId = '6571db6f890ed6c52bc4cd52'
     const userId = req.user._id
     console.log(userId, 'req.user')
     const numberSequence = response.data.split(":").pop().substring(2);
@@ -174,7 +174,8 @@ function generateRandomString(length) {
 
 app.use(adminRoutes);
 app.use(userRoutes);
+app.use(serviceRoutes);
 
-app.listen(5001, () => console.log("server started on 5001"));
+app.listen(3000, () => console.log("server started on 5001"));
 
 module.exports.handler = serverless(app);
