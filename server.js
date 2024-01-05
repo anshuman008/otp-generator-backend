@@ -15,8 +15,6 @@ const user_auth = require("./middleware/user_auth");
 const { createInHoldTransaction, failTransaction, successTransaction } = require("./controllers/money");
 
 const apiKey = "29963e8b073ee4b745be2ed51409fb08";
-const service = "us";
-const country = 22;
 
 app.use(express.json());
 app.use(cors());
@@ -29,8 +27,11 @@ app.use(
   })
 );
 
-app.get("/api/getNumber", user_auth, async (req, res) => {
+app.post("/api/getNumber", user_auth, async (req, res) => {
   try {
+
+    const { service, country } = req.body;
+
     const response = await axios.get(
       `https://api.grizzlysms.com/stubs/handler_api.php`,
       {
