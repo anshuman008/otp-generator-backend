@@ -11,11 +11,39 @@ router.get('/getServiceList', (req, res) => {
     res.json(Object.fromEntries(serviceMap));
 });
 
+router.get('/service/get-all', async (req, res) => {
+    try {
+        const data = await fetch('https://grizzlysms.com/api/service/get-all');
+        const response = await data.json();
+
+        res.status(200).send(response);
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
+router.get('/country/get-prices/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { page, wholesale, user } = req.query;
+        const data = await fetch(`https://grizzlysms.com/api/country/get-prices/${id}?page=${page}&wholesale=${wholesale}&user=${user}`);
+        const response = await data.json();
+
+        res.status(200).send(response);
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
 router.post('/getPriceByCountryService', async (req, res) => {
     try {
         const { country, service } = req.body;
+        console.log(req.body, 'body')
 
         const data = await fetch(`https://api.grizzlysms.com/stubs/handler_api.php?api_key=${process.env.API_KEY}&action=getPrices&service=${service}&country=${country}`)
+        console.log(data, 'data')
         const response = await data.json();
 
         let parsedData = response[country][service];
