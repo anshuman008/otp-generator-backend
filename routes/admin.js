@@ -150,11 +150,10 @@ router.post('/admin/createAdmin', auth, async (req, res) => {
 });
 
 // get log of the earnings
-router.post('/admin/earnings', auth, async (req, res) => {
+router.post('/admin/earnings', async (req, res) => {
     try {
         // get date range from the body
         const { from, to } = req.body;
-
         // Convert the dates to the log's date format
         const fromDate = formatToLogDate(from) + ",00:00:00";
         const toDate = formatToLogDate(to) + ",23:59:59";
