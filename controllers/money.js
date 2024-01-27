@@ -14,7 +14,6 @@ let createInHoldTransaction = async (
   // check if user has enough money in his account
 
   try {
-    console.log('in')
     const user = await User.findOne({ _id: userID });
     if (!user) {
       console.log("user not found");

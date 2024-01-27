@@ -4,23 +4,38 @@ const express = require("express");
 const axios = require("axios");
 const serverless = require("serverless-http");
 const app = express();
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const session = require("express-session");
 const { serviceMap } = require("./data/data_maps");
 const httpServer = require("http").createServer(app);
-const io = require("socket.io")(httpServer); // Add WebSocket support
+const io = require("socket.io")(httpServer, {
+  cors: {
+    origin: "http://localhost:3000",  // Replace with the actual domain where your frontend is hosted
+    methods: ["GET", "POST"],
+  },
+}); // Add WebSocket support
 
 const adminRoutes = require("./routes/admin");
 const userRoutes = require("./routes/user");
 const serviceRoutes = require("./routes/service");
+// const userAuthMiddleware = require("./middleware/user_auth");
 
 const user_auth = require("./middleware/user_auth");
 const { createInHoldTransaction, failTransaction, successTransaction } = require("./controllers/money");
+const User = require("./models/user");
 
 const apiKey = "5cfea7ce31c588a9513f10b528b7fe14";
 
+const corsOptions = {
+  origin: "http://localhost:3000", // Replace with your actual frontend domain
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
 app.use(express.json());
-app.use(cors());
+app.use(cors(corsOptions));
 const secretKey = generateRandomString(32);
 app.use(
   session({
@@ -30,9 +45,44 @@ app.use(
   })
 );
 
+const userAuthMiddleware = async (socket, next) => {
+  try {
+    if (socket.handshake.auth && socket.handshake.auth.token) {
+      const token = socket.handshake.auth.token;
+      // console.log('Token received:', token);
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findOne({ _id: decoded._id, 'tokens.token': token });
+      if (!user) {
+          throw new Error();
+      }
+
+      // In a real application, you might want to check the user in the database
+      // and ensure the token is still valid.
+
+      socket.request.user = user;
+      // console.log('User authenticated:', socket.request.user);
+
+      next();
+    } else {
+      throw new Error('Authorization token is missing');
+    }
+  } catch (error) {
+    console.error('Authentication error:', error.message);
+    next(new Error('Authentication failed'));
+  }
+};
+
+
+// io.use(userAuthMiddleware);
+
+io.use((socket, next) => {
+  userAuthMiddleware(socket, next);
+});
 io.on("connection", (socket) => {
-  // Handle WebSocket logic here
+  // socket.use(userAuthMiddleware);
   socket.on("getNumber", async (data) => {
+    console.log(data, 'data')
     try {
       const { service, country, amount, countryName } = data;
 
@@ -66,6 +116,7 @@ io.on("connection", (socket) => {
         socket.emit('responseA', { data: response.data });
       }
     } catch (error) {
+      console.log(error, 'err')
       socket.emit('responseA', { error: "Internal Server Error" });
     }
   });
@@ -157,12 +208,12 @@ const getOtp = async (phoneNumber, id) => {
   return response;
 };
 
-app.get("/captcha", (req, res) => {
-  const captcha = svgCaptcha.create();
-  req.session.captcha = captcha.text;
-  res.type("svg");
-  res.status(200).send(captcha.data);
-});
+// app.get("/captcha", (req, res) => {
+//   const captcha = svgCaptcha.create();
+//   req.session.captcha = captcha.text;
+//   res.type("svg");
+//   res.status(200).send(captcha.data);
+// });
 
 app.post("/verify-captcha", (req, res) => {
   const { captcha } = req.body;
