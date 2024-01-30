@@ -38,11 +38,12 @@ let createInHoldTransaction = async (
     await user.save();
     await log.save().then(res => {
 
-      setTimeout(async () => {
-        res.updateStatus()
-        const userData = user.money.inHold.filter(element => element.logID === log._id)
-        await userData.save()
-      },300000)
+      // setTimeout(async () => {
+      //   res.updateStatus()
+      //   console.log(user.money, 'money')
+      //   const logs = await Log.find({ userID: req.user._id });
+      //   await userData.save()
+      // },5000)
     });
     return log;
   } catch (e) {
