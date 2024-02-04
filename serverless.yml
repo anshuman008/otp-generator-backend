@@ -1,4 +1,4 @@
-service: otp-service
+service: otp-service-backend
 frameworkVersion: "3"
 
 plugins:
@@ -8,12 +8,10 @@ provider:
     name: aws
     runtime: nodejs16.x
     region: ap-south-1
-    deploymentBucket:
-        name: otp-backend-deployment-bucket
 
 functions:
     api:
-        handler: index.handler
+        handler: server.handler
         timeout: 180
         events:
             - httpApi: "*"
@@ -25,3 +23,9 @@ functions:
                   path: /{proxy+}
                   method: ANY
                   cors: true
+            - websocket:
+                route: $connect
+            - websocket:
+                route: $disconnect
+            - websocket:
+                route: $default

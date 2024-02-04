@@ -30,10 +30,10 @@ const {
 const User = require("./models/user");
 const Log = require("./models/log");
 
-const apiKey = "5cfea7ce31c588a9513f10b528b7fe14";
+const apiKey = "75f412443eb0a27a6b3ae5e9b45fe0dd";
 
 const corsOptions = {
-  origin: "http://localhost:3000", // Replace with your actual frontend domain
+  origin: "*", // Replace with your actual frontend domain
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   optionsSuccessStatus: 200,
@@ -81,14 +81,15 @@ io.use((socket, next) => {
 let otpInterval;
 let resendOtpInterval;
 let elapsedTime = 0;
+const otpReceivedFlags = {};
 
 io.on("connection", (socket) => {
   socket.on("getNumber", async (data) => {
     try {
       const { service, country, amount, countryName } = data;
 
-      const response = await axios.get(
-        `https://api.grizzlysms.com/stubs/handler_api.php`,
+      const response = await fetch(
+        "https://api.grizzlysms.com/stubs/handler_api.php",
         {
           params: {
             api_key: apiKey,
@@ -100,51 +101,60 @@ io.on("connection", (socket) => {
             Authorization: `Bearer ${apiKey}`,
           },
           withCredentials: true,
-        },
-        {
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-          },
         }
       );
+
       const userId = socket.request.user._id;
-      const numberSequence = response.data.split(":").pop().substring(2);
-      const activationId = response.data.split(":")[1];
 
-      const handleTransaction = await createInHoldTransaction(
-        userId,
-        amount,
-        serviceMap.get(service),
-        countryName,
-        numberSequence
-      );
-      // Before this timeout need to start interval for getOtp
-      otpInterval = setInterval(() => {
-        getOtp(numberSequence, activationId, socket);
-        elapsedTime += 1000;
-        if (elapsedTime >= 60000) {
-          clearInterval(otpInterval);
+      if (response.data.includes("ACCESS_NUMBER")) {
+        const numberSequence = response.data.split(":").pop().substring(2);
+        const activationId = response.data.split(":")[1];
+        otpReceivedFlags[activationId] = false;
+
+        const handleTransaction = await createInHoldTransaction(
+          userId,
+          amount,
+          serviceMap.get(service),
+          countryName,
+          numberSequence
+        );
+
+        if (!response.data.includes("NO_NUMBERS")) {
+          otpInterval = setInterval(() => {
+            getOtp(numberSequence, activationId, socket);
+            elapsedTime += 1000;
+            if (elapsedTime >= 120000) {
+              clearInterval(otpInterval);
+            }
+          }, 1000);
+          setTimeout(async () => {
+            clearInterval(otpInterval);
+            const paramsData = { id: activationId, phoneNumber: numberSequence };
+            if (!otpReceivedFlags[activationId]) {
+              await handleCancel(paramsData);
+            }
+          }, 300000);
+
+          if (handleTransaction.error) {
+            socket.emit("responseA", { error: handleTransaction.error });
+          } else {
+            socket.emit("responseA", { data: response.data });
+          }
         }
-      }, 1000);
-      setTimeout(async () => {
-        clearInterval(otpInterval);
-        const paramsData = { id: activationId, phoneNumber: numberSequence };
-        await handleCancel(paramsData);
-      }, 300000);
-
-      if (handleTransaction.error) {
-        socket.emit("responseA", { error: handleTransaction.error });
+      } else if (response.data.includes("NO_NUMBERS")) {
+        // Handle the case where "NO_NUMBERS" is received
+        socket.emit("responseA", { error: "No available numbers" });
       } else {
-        socket.emit("responseA", { data: response.data });
+        // Handle unexpected response
+        socket.emit("responseA", { error: "Unexpected response from API" });
       }
     } catch (error) {
-      console.log(error, "err");
       socket.emit("responseA", { error: "Internal Server Error" });
     }
   });
 
   const handleCancel = async (data) => {
-    console.log("cancel called");
+
     try {
       const { id, phoneNumber } = data;
 
@@ -160,7 +170,6 @@ io.on("connection", (socket) => {
         `https://api.grizzlysms.com/stubs/handler_api.php?api_key=${apiKey}&action=setStatus&id=${id}&status=8&forward=$forward`
       );
 
-      console.log(response.data, "res");
       if (response.status === 200) {
         await failTransaction(phoneNumber);
         socket.emit("cancelOperation", { data: true, number: phoneNumber });
@@ -172,8 +181,16 @@ io.on("connection", (socket) => {
   };
 
   socket.on("cancelNumber", async (data) => {
-    console.log(data, "data cancel");
-    handleCancel(data);
+    const { id: activationId } = data;
+    if (!otpReceivedFlags[activationId]) {
+      // Only allow cancellation if no OTP has been received
+      clearInterval(otpInterval)
+      handleCancel(data);
+    } else {
+      socket.emit("responseC", {
+        error: "Cannot cancel number, OTP has already been received.",
+      });
+    }
   });
 
   let otpElapsedTime;
@@ -191,7 +208,7 @@ io.on("connection", (socket) => {
 });
 
 const getOtp = async (phoneNumber, id, socket) => {
-  const response = await axios.get(
+  const response = await fetch(
     `https://api.grizzlysms.com/stubs/handler_api.php`,
     {
       params: {
@@ -210,23 +227,24 @@ const getOtp = async (phoneNumber, id, socket) => {
       },
     }
   );
-  console.log(response.data, "dataaa");
   if (response.data.includes("STATUS_CANCEL")) {
     clearInterval(otpInterval);
   }
   if (response.data.includes("STATUS_OK")) {
     clearInterval(otpInterval);
     const otp = response.data.split(":")[1];
+    otpReceivedFlags[id] = true;
     await successTransaction(phoneNumber, otp);
-    socket.emit("optResponse", { data: otp, number: phoneNumber });
-  } else {
-    socket.emit("optResponse", { msg: "OTP could not be generated" });
+    socket.emit("otpResponse", { data: otp, number: phoneNumber });
   }
+  // else {
+  //   socket.emit("otpResponse", { msg: "OTP could not be generated" });
+  // }
   return response;
 };
 
 const resendOtp = async (phoneNumber, id, socket) => {
-  const response = await axios.get(
+  const response = await fetch(
     `https://api.grizzlysms.com/stubs/handler_api.php`,
     {
       params: {
@@ -247,17 +265,15 @@ const resendOtp = async (phoneNumber, id, socket) => {
       },
     }
   );
-  console.log(response.data, 'reseponsaa')
   if (response.data.includes("STATUS_CANCEL")) {
     clearInterval(resendOtpInterval);
   }
   if (response.data.includes("STATUS_OK")) {
     clearInterval(resendOtpInterval);
     const otp = response.data.split(":")[1];
+    otpReceivedFlags[id] = true;
     await successTransaction(phoneNumber, otp);
     socket.emit("resendResponse", { data: otp, number: phoneNumber });
-  } else {
-    socket.emit("resendResponse", { msg: "OTP could not be generated" });
   }
   return response;
 };
@@ -286,6 +302,6 @@ app.use(adminRoutes);
 app.use(userRoutes);
 app.use(serviceRoutes);
 
-httpServer.listen(5001, () => console.log("server started on 5001"));
+// httpServer.listen(5001, () => console.log("server started on 5001"));
 
 module.exports.handler = serverless(app);
