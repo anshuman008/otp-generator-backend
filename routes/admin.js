@@ -10,7 +10,9 @@ const { searchUser, createUser } = require('../controllers/user');
 const formatToLogDate = require('../controllers/time_format');
 
 // login
+
 router.post('/admin/login', async (req, res) => {
+    console.log('kiiiiii')
     try {
         const admin = await Admin.findByCredentials(req.body.email, req.body.password);
         const token = await admin.generateAuthToken();
@@ -137,6 +139,7 @@ router.post('/admin/createUser', auth, async (req, res) => {
 
 // create a admin
 router.post('/admin/createAdmin', auth, async (req, res) => {
+    
     const { name, email, password } = req.body;
     try {
         const admin = await createAdmin(name, email, password);

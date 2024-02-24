@@ -10,6 +10,8 @@ const session = require("express-session");
 const { serviceMap } = require("./data/data_maps");
 const httpServer = require("http").createServer(app);
 const io = require("socket.io")(httpServer, {
+  transports: ['websocket'],
+  allowEIO3: true,
   cors: {
     origin: "http://localhost:3000", // Replace with the actual domain where your frontend is hosted
     methods: ["GET", "POST"],
@@ -302,6 +304,6 @@ app.use(adminRoutes);
 app.use(userRoutes);
 app.use(serviceRoutes);
 
-// httpServer.listen(5001, () => console.log("server started on 5001"));
+httpServer.listen(5001, () => console.log("server started on 5001"));
 
 module.exports.handler = serverless(app);
