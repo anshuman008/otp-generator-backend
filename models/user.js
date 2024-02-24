@@ -26,25 +26,25 @@ const userSchema = new mongoose.Schema({
             type: Number,
             default: 0
         },
-        inHold: [
-            {
-                logID: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    required: true,
-                    ref: 'Log'
-                },
-                amount: {
-                    type: Number,
-                    required: true
-                },
-                // exire after 5 minutes
-                // expireAt: {
-                //     type: Date,
-                //     default: Date.now,
-                //     index: { expires: 300 }
-                // }
-            }
-        ]
+        // inHold: [
+        //     {
+        //         logID: {
+        //             type: mongoose.Schema.Types.ObjectId,
+        //             required: true,
+        //             ref: 'Log'
+        //         },
+        //         amount: {
+        //             type: Number,
+        //             required: true
+        //         },
+        //         // exire after 5 minutes
+        //         // expireAt: {
+        //         //     type: Date,
+        //         //     default: Date.now,
+        //         //     index: { expires: 300 }
+        //         // }
+        //     }
+        // ]
     },
     tokens: [{
         token: {

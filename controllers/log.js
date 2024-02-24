@@ -3,7 +3,6 @@ const mongoose = require('mongoose');
 const Log = require('../models/log');
 
 let createLog = async (userID, amount, otpGenerratedFor, phoneNumber) => {
-    console.log(userID, amount, otpGenerratedFor, phoneNumber, 'userID, amount, otpGenerratedFor, phoneNumber')
     const log = new Log({ userID, amount, otpGenerratedFor, phoneNumber });
     try {
         await log.save();

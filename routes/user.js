@@ -51,7 +51,12 @@ router.get('/user/me', auth, async (req, res) => {
     if (!req.user.isPasswordChanged) {
        return res.status(401).send({ error: 'Please change your password' , user: req.user});
     }
-    res.send({user: req.user});
+    let rawUser = {...req.user};
+    let user = rawUser._doc
+    const logs = await Log.find({ userID: req.user._id });
+    const inHoldLogs = logs.filter(element => element.status === 'in_process')
+    user.money.inHold = inHoldLogs;
+    res.send({user: user});
 });
 
 // update user profile

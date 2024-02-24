@@ -10,7 +10,9 @@ const { searchUser, createUser } = require('../controllers/user');
 const formatToLogDate = require('../controllers/time_format');
 
 // login
+
 router.post('/admin/login', async (req, res) => {
+    console.log('kiiiiii')
     try {
         const admin = await Admin.findByCredentials(req.body.email, req.body.password);
         const token = await admin.generateAuthToken();
@@ -137,6 +139,7 @@ router.post('/admin/createUser', auth, async (req, res) => {
 
 // create a admin
 router.post('/admin/createAdmin', auth, async (req, res) => {
+    
     const { name, email, password } = req.body;
     try {
         const admin = await createAdmin(name, email, password);
@@ -150,11 +153,10 @@ router.post('/admin/createAdmin', auth, async (req, res) => {
 });
 
 // get log of the earnings
-router.post('/admin/earnings', auth, async (req, res) => {
+router.post('/admin/earnings', async (req, res) => {
     try {
         // get date range from the body
         const { from, to } = req.body;
-
         // Convert the dates to the log's date format
         const fromDate = formatToLogDate(from) + ",00:00:00";
         const toDate = formatToLogDate(to) + ",23:59:59";

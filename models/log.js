@@ -30,6 +30,9 @@ const logSchema = new mongoose.Schema({
     otpGenerratedFor: {
         type: String
     },
+    countryName: {
+        type: String
+    },
     phoneNumber: {
         type: String
     },
@@ -41,6 +44,13 @@ const logSchema = new mongoose.Schema({
         default: getCurrentISTDate // Use the custom function for default value
     }
 });
+
+logSchema.methods.updateStatus = function() {
+    if(this.status !== 'success') {
+        this.status = 'failed';
+        this.save()
+    }
+}
 
 const Log = mongoose.model('Log', logSchema);
 

@@ -4,22 +4,45 @@ const express = require("express");
 const axios = require("axios");
 const serverless = require("serverless-http");
 const app = express();
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const session = require("express-session");
+const { serviceMap } = require("./data/data_maps");
+const httpServer = require("http").createServer(app);
+const io = require("socket.io")(httpServer, {
+  transports: ['websocket'],
+  allowEIO3: true,
+  cors: {
+    origin: "http://localhost:3000", // Replace with the actual domain where your frontend is hosted
+    methods: ["GET", "POST"],
+  },
+}); // Add WebSocket support
 
 const adminRoutes = require("./routes/admin");
 const userRoutes = require("./routes/user");
 const serviceRoutes = require("./routes/service");
+// const userAuthMiddleware = require("./middleware/user_auth");
 
 const user_auth = require("./middleware/user_auth");
-const { createInHoldTransaction, failTransaction, successTransaction } = require("./controllers/money");
+const {
+  createInHoldTransaction,
+  failTransaction,
+  successTransaction,
+} = require("./controllers/money");
+const User = require("./models/user");
+const Log = require("./models/log");
 
-const apiKey = "29963e8b073ee4b745be2ed51409fb08";
-const service = "us";
-const country = 22;
+const apiKey = "75f412443eb0a27a6b3ae5e9b45fe0dd";
+
+const corsOptions = {
+  origin: "*", // Replace with your actual frontend domain
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
 
 app.use(express.json());
-app.use(cors());
+app.use(cors(corsOptions));
 const secretKey = generateRandomString(32);
 app.use(
   session({
@@ -29,128 +52,233 @@ app.use(
   })
 );
 
-app.get("/api/getNumber", user_auth, async (req, res) => {
+const userAuthMiddleware = async (socket, next) => {
   try {
-    const response = await axios.get(
-      `https://api.grizzlysms.com/stubs/handler_api.php`,
-      {
-        params: {
-          api_key: apiKey,
-          action: "getNumber",
-          service,
-          country,
-        },
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-        withCredentials: true,
-      },
-      {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-        },
+    if (socket.handshake.auth && socket.handshake.auth.token) {
+      const token = socket.handshake.auth.token;
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findOne({
+        _id: decoded._id,
+        "tokens.token": token,
+      });
+      if (!user) {
+        throw new Error();
       }
-    );
-    const userId = req.user._id
-    console.log(userId, 'req.user')
-    const numberSequence = response.data.split(":").pop().substring(2);
-    const handleTransaction = await createInHoldTransaction(userId, 10, 'irctc', numberSequence);
-    if (handleTransaction.error) {
-      console.log(handleTransaction.error, 'errr')
-      res.status(404);
+      socket.request.user = user;
+      next();
+    } else {
+      throw new Error("Authorization token is missing");
     }
-    res.json({ data: response.data });
   } catch (error) {
-    console.error("Error fetching data from the APIs:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("Authentication error:", error.message);
+    next(new Error("Authentication failed"));
   }
+};
+
+io.use((socket, next) => {
+  userAuthMiddleware(socket, next);
 });
 
-app.get("/api/cancelNumber", user_auth, async (req, res) => {
-  try {
-    const { id, phoneNumber } = req.query;
+let otpInterval;
+let resendOtpInterval;
+let elapsedTime = 0;
+const otpReceivedFlags = {};
 
-    if (!id) {
-      return res.status(400).json({ error: "Missing 'id' parameter" });
-    }
-    if (!phoneNumber) {
-      return res.status(400).json({ error: "Missing 'phoneNumber' parameter" });
-    }
+io.on("connection", (socket) => {
+  socket.on("getNumber", async (data) => {
+    try {
+      const { service, country, amount, countryName } = data;
 
-    const response = await axios.get(
-      `https://api.grizzlysms.com/stubs/handler_api.php`,
-      {
-        params: {
-          api_key: apiKey,
-          action: "setStatus",
-          id: id,
-          status: 8,
-          forward: `$forward`,
-        },
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-        withCredentials: true,
-      },
-      {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-        },
+      const response = await fetch(
+        "https://api.grizzlysms.com/stubs/handler_api.php",
+        {
+          params: {
+            api_key: apiKey,
+            action: "getNumber",
+            service,
+            country,
+          },
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+          withCredentials: true,
+        }
+      );
+
+      const userId = socket.request.user._id;
+
+      if (response.data.includes("ACCESS_NUMBER")) {
+        const numberSequence = response.data.split(":").pop().substring(2);
+        const activationId = response.data.split(":")[1];
+        otpReceivedFlags[activationId] = false;
+
+        const handleTransaction = await createInHoldTransaction(
+          userId,
+          amount,
+          serviceMap.get(service),
+          countryName,
+          numberSequence
+        );
+
+        if (!response.data.includes("NO_NUMBERS")) {
+          otpInterval = setInterval(() => {
+            getOtp(numberSequence, activationId, socket);
+            elapsedTime += 1000;
+            if (elapsedTime >= 120000) {
+              clearInterval(otpInterval);
+            }
+          }, 1000);
+          setTimeout(async () => {
+            clearInterval(otpInterval);
+            const paramsData = { id: activationId, phoneNumber: numberSequence };
+            if (!otpReceivedFlags[activationId]) {
+              await handleCancel(paramsData);
+            }
+          }, 300000);
+
+          if (handleTransaction.error) {
+            socket.emit("responseA", { error: handleTransaction.error });
+          } else {
+            socket.emit("responseA", { data: response.data });
+          }
+        }
+      } else if (response.data.includes("NO_NUMBERS")) {
+        // Handle the case where "NO_NUMBERS" is received
+        socket.emit("responseA", { error: "No available numbers" });
+      } else {
+        // Handle unexpected response
+        socket.emit("responseA", { error: "Unexpected response from API" });
       }
-    );
-    await failTransaction(phoneNumber)
-    res.json(response.data);
-  } catch (error) {
-    console.error("Error fetching data from the APIs:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
-
-app.get("/api/getOtp", async (req, res) => {
-  try {
-    const { id, phoneNumber } = req.query;
-
-    if (!id) {
-      return res.status(400).json({ error: "Missing 'id' parameter" });
+    } catch (error) {
+      socket.emit("responseA", { error: "Internal Server Error" });
     }
+  });
 
-    const response = await axios.get(
-      `https://api.grizzlysms.com/stubs/handler_api.php`,
-      {
-        params: {
-          api_key: apiKey,
-          action: "getStatus",
-          id: id,
-        },
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-        withCredentials: true,
-      },
-      {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-        },
+  const handleCancel = async (data) => {
+
+    try {
+      const { id, phoneNumber } = data;
+
+      if (!id) {
+        socket.emit("responseC", { error: "Missing 'id' parameter" });
+        return;
       }
-    );
-    if (response.data.includes("STATUS_OK")) {
-      console.log('status ok')
-      const otp = response.data.split(":")[1]
-      await successTransaction(phoneNumber, otp);
+      if (!phoneNumber) {
+        socket.emit("responseC", { error: "Missing 'phoneNumber' parameter" });
+        return;
+      }
+      const response = await fetch(
+        `https://api.grizzlysms.com/stubs/handler_api.php?api_key=${apiKey}&action=setStatus&id=${id}&status=8&forward=$forward`
+      );
+
+      if (response.status === 200) {
+        await failTransaction(phoneNumber);
+        socket.emit("cancelOperation", { data: true, number: phoneNumber });
+      }
+    } catch (error) {
+      console.error("Error fetching data from the APIs:", error.message);
+      socket.emit("cancelOperation", { data: false });
     }
-    res.json(response.data);
-  } catch (error) {
-    console.error("Error fetching data from the APIs:", error.message);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+  };
+
+  socket.on("cancelNumber", async (data) => {
+    const { id: activationId } = data;
+    if (!otpReceivedFlags[activationId]) {
+      // Only allow cancellation if no OTP has been received
+      clearInterval(otpInterval)
+      handleCancel(data);
+    } else {
+      socket.emit("responseC", {
+        error: "Cannot cancel number, OTP has already been received.",
+      });
+    }
+  });
+
+  let otpElapsedTime;
+  socket.on("resendOtp", (data) => {
+    const { phoneNumber, id } = data;
+    otpElapsedTime = 0;
+    resendOtpInterval = setInterval(() => {
+      resendOtp(phoneNumber, id, socket);
+      otpElapsedTime += 1000;
+      if (otpElapsedTime >= 60000) {
+        clearInterval(resendOtpInterval);
+      }
+    }, 1000);
+  });
 });
 
-app.get("/captcha", (req, res) => {
-  const captcha = svgCaptcha.create();
-  req.session.captcha = captcha.text;
-  res.type("svg");
-  res.status(200).send(captcha.data);
-});
+const getOtp = async (phoneNumber, id, socket) => {
+  const response = await fetch(
+    `https://api.grizzlysms.com/stubs/handler_api.php`,
+    {
+      params: {
+        api_key: apiKey,
+        action: "getStatus",
+        id: id,
+      },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+      withCredentials: true,
+    },
+    {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    }
+  );
+  if (response.data.includes("STATUS_CANCEL")) {
+    clearInterval(otpInterval);
+  }
+  if (response.data.includes("STATUS_OK")) {
+    clearInterval(otpInterval);
+    const otp = response.data.split(":")[1];
+    otpReceivedFlags[id] = true;
+    await successTransaction(phoneNumber, otp);
+    socket.emit("otpResponse", { data: otp, number: phoneNumber });
+  }
+  // else {
+  //   socket.emit("otpResponse", { msg: "OTP could not be generated" });
+  // }
+  return response;
+};
+
+const resendOtp = async (phoneNumber, id, socket) => {
+  const response = await fetch(
+    `https://api.grizzlysms.com/stubs/handler_api.php`,
+    {
+      params: {
+        api_key: apiKey,
+        action: "getStatus",
+        id: id,
+        status: 3,
+        forward: "$forward",
+      },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+      withCredentials: true,
+    },
+    {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      },
+    }
+  );
+  if (response.data.includes("STATUS_CANCEL")) {
+    clearInterval(resendOtpInterval);
+  }
+  if (response.data.includes("STATUS_OK")) {
+    clearInterval(resendOtpInterval);
+    const otp = response.data.split(":")[1];
+    otpReceivedFlags[id] = true;
+    await successTransaction(phoneNumber, otp);
+    socket.emit("resendResponse", { data: otp, number: phoneNumber });
+  }
+  return response;
+};
 
 app.post("/verify-captcha", (req, res) => {
   const { captcha } = req.body;
@@ -176,6 +304,6 @@ app.use(adminRoutes);
 app.use(userRoutes);
 app.use(serviceRoutes);
 
-app.listen(3000, () => console.log("server started on 5001"));
+httpServer.listen(5001, () => console.log("server started on 5001"));
 
 module.exports.handler = serverless(app);
