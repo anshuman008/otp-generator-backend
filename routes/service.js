@@ -12,6 +12,7 @@ router.get('/getServiceList', (req, res) => {
     res.json(Object.fromEntries(serviceMap));
 });
 
+// get all services
 router.get('/service/get-all', async (req, res) => {
     try {
         const data = await axios.get('https://grizzlysms.com/api/service/get-all');
