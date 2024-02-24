@@ -13,6 +13,7 @@ router.get('/getServiceList', (req, res) => {
 });
 
 // get all services
+//new route is here
 router.get('/service/get-all', async (req, res) => {
     try {
         const data = await axios.get('https://grizzlysms.com/api/service/get-all');
@@ -39,6 +40,9 @@ router.get('/country/get-prices/:id', async (req, res) => {
         res.status(500).send('Internal Server Error');
     }
 });
+
+
+
 
 router.post('/getPriceByCountryService', async (req, res) => {
     try {
