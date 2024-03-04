@@ -304,6 +304,6 @@ app.use(adminRoutes);
 app.use(userRoutes);
 app.use(serviceRoutes);
 
-httpServer.listen(5001, () => console.log("server started on 5001"));
+httpServer.listen(3000, () => console.log("server started on 3000"));
 
 module.exports.handler = serverless(app);
