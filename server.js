@@ -356,7 +356,11 @@ function generateRandomString(length) {
 app.use(adminRoutes);
 app.use(userRoutes);
 app.use(serviceRoutes);
+// port changed
 
 httpServer.listen(3001, () => console.log("server started on 3000"));
+
+
+
 
 module.exports.handler = serverless(app);
