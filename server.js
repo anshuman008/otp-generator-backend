@@ -10,11 +10,12 @@ const session = require("express-session");
 const { serviceMap } = require("./data/data_maps");
 const httpServer = require("http").createServer(app);
 const io = require("socket.io")(httpServer, {
-  transports: ['websocket'],
+  transports: ['websocket', 'polling'], // Specify transports
   allowEIO3: true,
   cors: {
     origin: "http://localhost:3000", // Replace with the actual domain where your frontend is hosted
     methods: ["GET", "POST"],
+    credentials: true
   },
 }); // Add WebSocket support
 
@@ -32,7 +33,7 @@ const {
 const User = require("./models/user");
 const Log = require("./models/log");
 
-const apiKey = "75f412443eb0a27a6b3ae5e9b45fe0dd";
+const apiKey = "pYZeHfYnGPbBhuDm7lNnYzt5vGXqyyF3";
 
 const corsOptions = {
   origin: "*", // Replace with your actual frontend domain
@@ -86,27 +87,32 @@ let elapsedTime = 0;
 const otpReceivedFlags = {};
 
 io.on("connection", (socket) => {
+  console.log('connected new user', socket.id)
+
   socket.on("getNumber", async (data) => {
+    console.log('get number aya', socket.id)
+
     try {
       const { service, country, amount, countryName } = data;
 
-      const response = await fetch(
-        "https://api.grizzlysms.com/stubs/handler_api.php",
-        {
-          params: {
-            api_key: apiKey,
-            action: "getNumber",
-            service,
-            country,
-          },
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-          withCredentials: true,
-        }
-      );
+      const url = 'https://smsbower.com/stubs/handler_api.php';
+      const params = {
+        api_key: 'pYZeHfYnGPbBhuDm7lNnYzt5vGXqyyF3', // Use your actual API key
+        action: 'getNumber',
+        service: service,
+        country: country,
+      };
+        //  console.log(data,'all details')
+    
+          const response = await axios.get(url, { params });
+          // res.json(response.data);
+          // console.log(response.data,'rsponce hai yah bhai')
+      
 
-      const userId = socket.request.user._id;
+
+          const userId = socket.request.user._id;
+
+      console.log(response.data,'data hai yah')
 
       if (response.data.includes("ACCESS_NUMBER")) {
         const numberSequence = response.data.split(":").pop().substring(2);
@@ -124,8 +130,10 @@ io.on("connection", (socket) => {
         if (!response.data.includes("NO_NUMBERS")) {
           otpInterval = setInterval(() => {
             getOtp(numberSequence, activationId, socket);
+            // console.log(elapsedTime,'timer hai');
             elapsedTime += 1000;
-            if (elapsedTime >= 120000) {
+            if (elapsedTime >= 1400000) {
+              elapsedTime = 0;
               clearInterval(otpInterval);
             }
           }, 1000);
@@ -135,16 +143,19 @@ io.on("connection", (socket) => {
             if (!otpReceivedFlags[activationId]) {
               await handleCancel(paramsData);
             }
-          }, 300000);
+          }, 1500000);
 
           if (handleTransaction.error) {
+            console.log('tmcc')
             socket.emit("responseA", { error: handleTransaction.error });
           } else {
+            console.log('hewliii')
             socket.emit("responseA", { data: response.data });
           }
         }
       } else if (response.data.includes("NO_NUMBERS")) {
         // Handle the case where "NO_NUMBERS" is received
+        console.log('no number available');
         socket.emit("responseA", { error: "No available numbers" });
       } else {
         // Handle unexpected response
@@ -168,10 +179,19 @@ io.on("connection", (socket) => {
         socket.emit("responseC", { error: "Missing 'phoneNumber' parameter" });
         return;
       }
-      const response = await fetch(
-        `https://api.grizzlysms.com/stubs/handler_api.php?api_key=${apiKey}&action=setStatus&id=${id}&status=8&forward=$forward`
-      );
 
+      const url = 'https://smsbower.com/stubs/handler_api.php';
+      const params = {
+        api_key: 'pYZeHfYnGPbBhuDm7lNnYzt5vGXqyyF3', // Use your actual API key
+        action: 'setStatus',
+        status: '8',
+        id: id,
+      };
+   
+        const response = await axios.get(url, { params });
+    
+
+        
       if (response.status === 200) {
         await failTransaction(phoneNumber);
         socket.emit("cancelOperation", { data: true, number: phoneNumber });
@@ -210,29 +230,51 @@ io.on("connection", (socket) => {
 });
 
 const getOtp = async (phoneNumber, id, socket) => {
-  const response = await fetch(
-    `https://api.grizzlysms.com/stubs/handler_api.php`,
-    {
-      params: {
-        api_key: apiKey,
-        action: "getStatus",
+
+  const url = 'https://smsbower.com/stubs/handler_api.php';
+      const params = {
+        api_key: 'pYZeHfYnGPbBhuDm7lNnYzt5vGXqyyF3', // Use your actual API key
+        action: 'getStatus',
         id: id,
-      },
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-      withCredentials: true,
-    },
-    {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-      },
-    }
-  );
+      };
+        //  console.log(data,'all details')
+    
+          const response = await axios.get(url, { params });
+          // res.json(response.data);
+          // console.log(response.data,'rsponce hai yah bhai')
+      
+
+
+          // const userId = socket.request.user._id;
+
+  // const response = await fetch(
+  //   `https://smsbower.com/stubs/handler_api.php`,
+  //   {
+  //     params: {
+  //       api_key: apiKey,
+  //       action: "getStatus",
+  //       id: id,
+  //     },
+  //     headers: {
+  //       Authorization: `Bearer ${apiKey}`,
+  //     },
+  //     withCredentials: true,
+  //   },
+  //   {
+  //     headers: {
+  //       "Access-Control-Allow-Origin": "*",
+  //     },
+  //   }
+  // );
+
+  console.log(response.data,'status hai yah')
+
   if (response.data.includes("STATUS_CANCEL")) {
+    console.log('cancel ho gya')
     clearInterval(otpInterval);
   }
   if (response.data.includes("STATUS_OK")) {
+    console.log('status done hai')
     clearInterval(otpInterval);
     const otp = response.data.split(":")[1];
     otpReceivedFlags[id] = true;
@@ -246,27 +288,38 @@ const getOtp = async (phoneNumber, id, socket) => {
 };
 
 const resendOtp = async (phoneNumber, id, socket) => {
-  const response = await fetch(
-    `https://api.grizzlysms.com/stubs/handler_api.php`,
-    {
-      params: {
-        api_key: apiKey,
-        action: "getStatus",
-        id: id,
-        status: 3,
-        forward: "$forward",
-      },
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-      withCredentials: true,
-    },
-    {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-      },
-    }
-  );
+
+  const url = 'https://smsbower.com/stubs/handler_api.php';
+  const params = {
+    api_key: 'pYZeHfYnGPbBhuDm7lNnYzt5vGXqyyF3', // Use your actual API key
+    action: 'getStatus',
+    id: id,
+    status: 3,
+  };
+    //  console.log(data,'all details')
+
+  const response = await axios.get(url, { params });
+  // const response = await fetch(
+  //   `https://api.grizzlysms.com/stubs/handler_api.php`,
+  //   {
+  //     params: {
+  //       api_key: apiKey,
+  //       action: "getStatus",
+  //       id: id,
+  //       status: 3,
+  //       forward: "$forward",
+  //     },
+  //     headers: {
+  //       Authorization: `Bearer ${apiKey}`,
+  //     },
+  //     withCredentials: true,
+  //   },
+  //   {
+  //     headers: {
+  //       "Access-Control-Allow-Origin": "*",
+  //     },
+  //   }
+  // );
   if (response.data.includes("STATUS_CANCEL")) {
     clearInterval(resendOtpInterval);
   }
@@ -303,10 +356,11 @@ function generateRandomString(length) {
 app.use(adminRoutes);
 app.use(userRoutes);
 app.use(serviceRoutes);
-
-
 // port changed
 
-httpServer.listen(3000, () => console.log("server started on 3000"));
+httpServer.listen(3001, () => console.log("server started on 3000"));
+
+
+
 
 module.exports.handler = serverless(app);
