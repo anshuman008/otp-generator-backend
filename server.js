@@ -13,7 +13,7 @@ const io = require("socket.io")(httpServer, {
   transports: ['websocket', 'polling'], // Specify transports
   allowEIO3: true,
   cors: {
-    origin: "http://localhost:3000", // Replace with the actual domain where your frontend is hosted
+    origin: "*", // Replace with the actual domain where your frontend is hosted
     methods: ["GET", "POST"],
     credentials: true
   },
