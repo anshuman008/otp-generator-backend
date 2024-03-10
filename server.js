@@ -13,7 +13,7 @@ const io = require("socket.io")(httpServer, {
   transports: ['websocket', 'polling'], // Specify transports
   allowEIO3: true,
   cors: {
-    origin: "http://localhost:3000", // Replace with the actual domain where your frontend is hosted
+    origin: "*", // Replace with the actual domain where your frontend is hosted
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -87,10 +87,10 @@ let elapsedTime = 0;
 const otpReceivedFlags = {};
 
 io.on("connection", (socket) => {
-  console.log('connected new user', socket.id)
+  // console.log('connected new user', socket.id)
 
   socket.on("getNumber", async (data) => {
-    console.log('get number aya', socket.id)
+    // console.log('get number aya', socket.id)
 
     try {
       const { service, country, amount, countryName } = data;
@@ -112,7 +112,7 @@ io.on("connection", (socket) => {
 
           const userId = socket.request.user._id;
 
-      console.log(response.data,'data hai yah')
+      // console.log(response.data,'data hai yah')
 
       if (response.data.includes("ACCESS_NUMBER")) {
         const numberSequence = response.data.split(":").pop().substring(2);
@@ -146,16 +146,16 @@ io.on("connection", (socket) => {
           }, 1500000);
 
           if (handleTransaction.error) {
-            console.log('tmcc')
+            // console.log('tmcc')
             socket.emit("responseA", { error: handleTransaction.error });
           } else {
-            console.log('hewliii')
+            // console.log('hewliii')
             socket.emit("responseA", { data: response.data });
           }
         }
       } else if (response.data.includes("NO_NUMBERS")) {
         // Handle the case where "NO_NUMBERS" is received
-        console.log('no number available');
+        // console.log('no number available');
         socket.emit("responseA", { error: "No available numbers" });
       } else {
         // Handle unexpected response
@@ -267,14 +267,14 @@ const getOtp = async (phoneNumber, id, socket) => {
   //   }
   // );
 
-  console.log(response.data,'status hai yah')
+  // console.log(response.data,'status hai yah')
 
   if (response.data.includes("STATUS_CANCEL")) {
-    console.log('cancel ho gya')
+    // console.log('cancel ho gya')
     clearInterval(otpInterval);
   }
   if (response.data.includes("STATUS_OK")) {
-    console.log('status done hai')
+    // console.log('status done hai')
     clearInterval(otpInterval);
     const otp = response.data.split(":")[1];
     otpReceivedFlags[id] = true;
